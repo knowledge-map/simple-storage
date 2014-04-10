@@ -14,9 +14,11 @@ executable simple-storage
   main-is:              Server.hs
   hs-source-dirs:       src
   build-depends:        scotty >= 0.6,
-                        heroku >= 0.1.1.1, mongoDB,
+                        heroku >= 0.1.1.1,
+                        persistent, persistent-mongoDB,
                         wai, wai-extra,
-                        containers, random, mtl,
+                        containers, random, mtl, text,
+                        template-haskell,
                         base >= 4.6 && < 5
   ghc-options:          -Wall
   extensions:           OverloadedStrings

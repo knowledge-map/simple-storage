@@ -1,8 +1,5 @@
 import Web.Scotty
 
-import Web.Heroku.MongoDB (mongoLabConnParams)
-import qualified Database.MongoDB as Mongo
-
 import System.Environment (getEnvironment)
 import System.Random (randomRIO)
 
@@ -15,26 +12,30 @@ import Control.Monad.Trans (liftIO)
 main :: IO ()
 main = do
     port <- getEnvDef "PORT" 8000
-    dbParams <- mongoLabConnParams
     scotty port $ do
         get "/" $ text "Nothing to see here *whistles*"
 
         get "/:slug" $ do
             graphId <- fromSlug (param "slug")
-            json $ M.fromList [("id" :: String, show graphId)]
+            text "{}"
+            respondJson
 
         put "/:slug" $ do
             graphId <- fromSlug (param "slug")
-            json $ M.fromList [("id" :: String, show graphId)]
+            req <- jsonData
+            text req
+            respondJson
 
         post "/" $ do
-            graphId <- rand (0, 10000)
+            graphId <- fmap toSlug $ rand (10000, 100000)
             json $ M.fromList [("id" :: String, show graphId)]
 
     where
-        toSlug x = return $ encodeWithAlphabet base62 x
+        toSlug x = encodeWithAlphabet base62 x
         fromSlug = fmap    (decodeFromAlphabet base62)
         base62 = ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
+
+        respondJson = setHeader "content-type" "text/json"
 
         rand = liftIO . randomRIO :: (Int, Int) -> ActionM Int
         getEnvDef e d =
