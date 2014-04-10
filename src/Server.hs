@@ -1,5 +1,8 @@
 import Web.Scotty
 
+import Web.Heroku.MongoDB (mongoLabConnParams)
+import qualified Database.MongoDB as Mongo
+
 import System.Environment (getEnvironment)
 import System.Random (randomRIO)
 
@@ -12,6 +15,7 @@ import Control.Monad.Trans (liftIO)
 main :: IO ()
 main = do
     port <- getEnvDef "PORT" 8000
+    dbParams <- mongoLabConnParams
     scotty port $ do
         get "/" $ text "Nothing to see here *whistles*"
 

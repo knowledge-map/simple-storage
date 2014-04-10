@@ -14,6 +14,7 @@ executable simple-storage
   main-is:              Server.hs
   hs-source-dirs:       src
   build-depends:        scotty >= 0.6,
+                        heroku >= 0.1.1.1, mongoDB,
                         wai, wai-extra,
                         containers, random, mtl,
                         base >= 4.6 && < 5
