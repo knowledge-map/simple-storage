@@ -15,6 +15,7 @@ executable simple-storage
   hs-source-dirs:       src
   build-depends:        scotty >= 0.6,
                         wai, wai-extra,
+                        containers, random, mtl,
                         base >= 4.6 && < 5
   ghc-options:          -Wall
   extensions:           OverloadedStrings
