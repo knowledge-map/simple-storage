@@ -30,12 +30,12 @@ main = do
     where
         toSlug x = return $ encodeWithAlphabet base62 x
         fromSlug = fmap    (decodeFromAlphabet base62)
+        base62 = ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
 
         rand = liftIO . randomRIO :: (Int, Int) -> ActionM Int
         getEnvDef e d =
             getEnvironment >>= return . fromMaybe d . fmap read . lookup e
 
-        base62 = ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
         encodeWithAlphabet a 0 = [head a]
         encodeWithAlphabet a i = rest ++ [digit] where
             base = length a
