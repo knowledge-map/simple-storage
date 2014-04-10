@@ -1,5 +1,10 @@
 import Web.Scotty
 
+import Web.Heroku.MongoDB (parseDatabaseUrl)
+import Database.Persist.MongoDB (MongoConf(..), master, MongoAuth(..))
+import Network (PortID (PortNumber))
+import Database
+
 import System.Environment (getEnvironment)
 import System.Random (randomRIO)
 
@@ -11,6 +16,9 @@ import Control.Monad.Trans (liftIO)
 
 main :: IO ()
 main = do
+    conn <- getEnvDef "MONGOLAB_URI" testMongo >>= return . parseDatabaseUrl
+    let mongoConf = mongoConfFrom conn
+
     port <- getEnvDef "PORT" 8000
     scotty port $ do
         get "/" $ text "Nothing to see here *whistles*"
@@ -31,15 +39,29 @@ main = do
             json $ M.fromList [("id" :: String, show graphId)]
 
     where
-        toSlug x = encodeWithAlphabet base62 x
-        fromSlug = fmap    (decodeFromAlphabet base62)
-        base62 = ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
+        toSlug   = encodeWithAlphabet base62
+        fromSlug = fmap (decodeFromAlphabet base62)
+        base62   = ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
+
+        testMongo = "mongodb://test:test@localhost:29017/test"
 
         respondJson = setHeader "content-type" "text/json"
-
         rand = liftIO . randomRIO :: (Int, Int) -> ActionM Int
         getEnvDef e d =
             getEnvironment >>= return . fromMaybe d . fmap read . lookup e
+
+        mongoConfFrom params = MongoConf {
+            mgDatabase = getParam "dbname",
+            mgHost = getParam "host",
+            mgPort = PortNumber $ fromIntegral 29017,
+            mgAuth = Just $ MongoAuth (getParam "username") (getParam "password"),
+            mgAccessMode = master,
+            mgPoolStripes = 10,
+            mgStripeConnections = 1,
+            mgConnectionIdleTime = 1
+         } where getParam n = case lookup n params of
+                    Just v -> v
+                    Nothing -> error $ "Could not find parameter in database config URL."
 
         encodeWithAlphabet a 0 = [head a]
         encodeWithAlphabet a i = rest ++ [digit] where
