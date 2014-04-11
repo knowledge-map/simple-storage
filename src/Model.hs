@@ -29,7 +29,9 @@ Graph
     deriving Show
 |]
 
-parseDatabaseUrl :: String -> [(Text, Text)]
+type DatabaseConnInfo = [(Text, Text)]
+
+parseDatabaseUrl :: String -> DatabaseConnInfo
 parseDatabaseUrl durl =
     let muri = parseAbsoluteURI durl
         (auth, dbpath) = case muri of

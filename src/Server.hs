@@ -18,14 +18,14 @@ import Control.Monad.Trans (liftIO)
 
 main :: IO ()
 main = do
-    conn <- getEnvDef "MONGOLAB_URI" testMongo >>= return . parseDatabaseUrl
-    port <- getEnvDef "PORT" 8000
+    conn <- getEnvDef "MONGOLAB_URI" devMongo >>= return . parseDatabaseUrl
+    port <- fmap read $ getEnvDef "PORT" "8000"
     scotty port (app conn)
     where
-        testMongo = "mongodb://test:test@localhost:27017/simple-storage"
-        getEnvDef e d =
-            getEnvironment >>= return . fromMaybe d . fmap read . lookup e
+        devMongo = "mongodb://test:test@localhost:27017/simple-storage"
+        getEnvDef e d = getEnvironment >>= return . fromMaybe d . lookup e
 
+app :: DatabaseConnInfo -> ScottyM ()
 app conn = do
     get "/" $ text "Nothing to see here *whistles*"
 
