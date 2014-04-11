@@ -1,15 +1,17 @@
 import Web.Scotty
-
-import Web.Heroku.MongoDB (parseDatabaseUrl)
-import Database.Persist.MongoDB (MongoConf(..), master, MongoAuth(..))
-import Network (PortID (PortNumber))
 import Database
+import qualified Database.Persist as DB
+import Database.Persist ((==.))
+import qualified Database.Persist.MongoDB as Mongo
+
+import Network.HTTP.Types.Status (notFound404)
 
 import System.Environment (getEnvironment)
-import System.Random (randomRIO)
 
 import Data.Maybe (fromMaybe)
-import Data.List (elemIndex, mapAccumR)
+import Data.List (elemIndex, mapAccumR, transpose)
+import Data.Text.Lazy (fromStrict, toStrict)
+import Data.Text.Lazy.Encoding (decodeUtf8)
 import qualified Data.Map as M
 
 import Control.Monad.Trans (liftIO)
@@ -17,7 +19,8 @@ import Control.Monad.Trans (liftIO)
 main :: IO ()
 main = do
     conn <- getEnvDef "MONGOLAB_URI" testMongo >>= return . parseDatabaseUrl
-    let mongoConf = mongoConfFrom conn
+    let runDB = liftIO . withMongoDBConf (mongoConfFrom conn)
+        from f = f . Mongo.entityVal
 
     port <- getEnvDef "PORT" 8000
     scotty port $ do
@@ -25,8 +28,10 @@ main = do
 
         get "/:slug" $ do
             graphId <- fromSlug (param "slug")
-            text "{}"
-            respondJson
+            graph <- runDB $ DB.selectFirst [GraphIdent ==. graphId] []
+            case graph of
+                Just g  -> (text $ fromStrict $ graphConfig `from` g) >> respondJson
+                Nothing -> text "404 not found" >> status notFound404
 
         put "/:slug" $ do
             graphId <- fromSlug (param "slug")
@@ -35,33 +40,26 @@ main = do
             respondJson
 
         post "/" $ do
-            graphId <- fmap toSlug $ rand (10000, 100000)
-            json $ M.fromList [("id" :: String, show graphId)]
+            contents <- fmap (toStrict . decodeUtf8) body
+            graphId <- runDB $ do
+                existingEnt <- DB.selectFirst [] [DB.Desc GraphIdent]
+                let newId = case existingEnt of
+                        Nothing  -> 10000
+                        Just ent -> (graphIdent `from` ent) + 1
+                DB.insert $ Graph newId contents
+                return newId
+            json $ M.fromList [("id" :: String, show $ toSlug $ graphId)]
 
     where
         toSlug   = encodeWithAlphabet base62
         fromSlug = fmap (decodeFromAlphabet base62)
-        base62   = ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
+        base62   = concat . transpose $ [['a'..'z'], ['0'..'9'], ['A'..'Z']]
 
-        testMongo = "mongodb://test:test@localhost:29017/test"
+        testMongo = "mongodb://test:test@localhost:27017/simple-storage"
 
         respondJson = setHeader "content-type" "text/json"
-        rand = liftIO . randomRIO :: (Int, Int) -> ActionM Int
         getEnvDef e d =
             getEnvironment >>= return . fromMaybe d . fmap read . lookup e
-
-        mongoConfFrom params = MongoConf {
-            mgDatabase = getParam "dbname",
-            mgHost = getParam "host",
-            mgPort = PortNumber $ fromIntegral 29017,
-            mgAuth = Just $ MongoAuth (getParam "username") (getParam "password"),
-            mgAccessMode = master,
-            mgPoolStripes = 10,
-            mgStripeConnections = 1,
-            mgConnectionIdleTime = 1
-         } where getParam n = case lookup n params of
-                    Just v -> v
-                    Nothing -> error $ "Could not find parameter in database config URL."
 
         encodeWithAlphabet a 0 = [head a]
         encodeWithAlphabet a i = rest ++ [digit] where
