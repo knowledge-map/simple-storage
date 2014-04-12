@@ -1,3 +1,5 @@
+module Main where
+
 import Web.Scotty
 import Network.HTTP.Types.Status (notFound404)
 
@@ -30,14 +32,14 @@ app conn = do
     get "/" $ text "Nothing to see here *whistles*"
 
     get "/:slug" $ do
-        graphId <- fromSlug (param "slug")
+        graphId <- fmap fromSlug $ param "slug"
         graph <- runDB $ DB.selectFirst [GraphIdent ==. graphId] []
         case graph of
             Just g  -> (text $ fromStrict $ graphConfig `from` g) >> respondJson
             Nothing -> text "404 not found" >> status notFound404
 
     put "/:slug" $ do
-        graphId <- fromSlug (param "slug")
+        -- graphId <- fmap fromSlug $ param "slug"
         req <- jsonData
         text req
         respondJson
@@ -59,18 +61,22 @@ app conn = do
         respondJson = setHeader "content-type" "text/json"
 
         base62   = concat . transpose $ [['a'..'z'], ['0'..'9'], ['A'..'Z']]
-        toSlug   = encodeWithAlphabet base62
-        fromSlug = fmap (decodeFromAlphabet base62)
+        toSlug   = encodeWith base62
+        fromSlug = decodeFrom base62
 
-        encodeWithAlphabet a 0 = [head a]
-        encodeWithAlphabet a i = rest ++ [digit] where
-            base = length a
-            digit = a !! (i `mod` base)
-            remainder = i `div` base
-            rest = if remainder > 0
-                then encodeWithAlphabet a remainder
-                else ""
-        decodeFromAlphabet a = sum . snd . mapAccumR changeBase 0 where
-            base = length a
-            changeBase index element = (index+1, val element * base^index)
-            val element = fromMaybe 0 (elemIndex element a)
+encodeWith :: String -> Int -> String
+encodeWith alph num = reverse $ go alph num where
+    go a 0 = [head a]
+    go a i = digit : rest where
+        base = length a
+        digit = a !! (i `mod` base)
+        remainder = i `div` base
+        rest = if remainder > 0
+            then go a remainder
+            else ""
+
+decodeFrom :: String -> String -> Int
+decodeFrom alph = sum . snd . mapAccumR changeBase (0 :: Int) where
+    base = length alph
+    changeBase idx el = (idx + 1, val el * base^idx)
+    val el = fromMaybe 0 (elemIndex el alph)
