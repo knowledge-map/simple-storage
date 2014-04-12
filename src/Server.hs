@@ -35,15 +35,14 @@ app pool = do
         graphId <- fmap fromSlug $ param "slug"
         graph <- runDB $ DB.selectFirst [GraphIdent ==. graphId] []
         case graph of
-            Just g  -> (text $ fromStrict $ graphConfig `from` g) >> respondJson
+            Just g  -> plainJson $ fromStrict $ graphConfig `from` g
             Nothing -> text "404 not found" >> status notFound404
 
     put "/:slug" $ do
         graphId  <- fmap fromSlug $ param "slug"
         contents <- fmap (toStrict . decodeUtf8) body
         runDB $ DB.updateWhere [GraphIdent ==. graphId] [GraphConfig =. contents]
-        text $ fromStrict contents
-        respondJson
+        plainJson $ fromStrict contents
 
     post "/" $ do
         contents <- fmap (toStrict . decodeUtf8) body
@@ -59,7 +58,7 @@ app pool = do
     where
         runDB action = liftIO $ Mongo.runMongoDBPool Mongo.master action pool
         from f = f . Mongo.entityVal
-        respondJson = setHeader "content-type" "text/json"
+        plainJson t = text t >> setHeader "content-type" "text/json"
 
         base62   = concat . transpose $ [['a'..'z'], ['0'..'9'], ['A'..'Z']]
         toSlug   = encodeWith base62
