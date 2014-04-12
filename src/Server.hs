@@ -1,12 +1,12 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Main where
 
 import Web.Scotty
 import Network.HTTP.Types.Status (notFound404)
 
 import Model
+import Database.Persist hiding (get, insert)
 import qualified Database.Persist as DB
-import Database.Persist ((==.), (=.))
-import qualified Database.Persist.MongoDB as Mongo
 
 import System.Environment (getEnvironment)
 
@@ -22,13 +22,14 @@ main :: IO ()
 main = do
     conn <- getEnvDef "MONGOLAB_URI" devMongo >>= return . parseDatabaseUrl
     port <- fmap read $ getEnvDef "PORT" "8000"
-    withMongoDBConf (mongoConfFrom conn) $ \pool -> scotty port (app pool)
+    let conf = mongoConfFrom conn
+    pool <- createPoolConfig conf
+    scotty port (app conf pool)
     where
         devMongo = "mongodb://test:test@localhost:27017/simple-storage"
         getEnvDef e d = getEnvironment >>= return . fromMaybe d . lookup e
 
-app :: Mongo.ConnectionPool -> ScottyM ()
-app pool = do
+app conf pool = do
     get "/" $ text "Nothing to see here *whistles*"
 
     get "/:slug" $ do
@@ -56,8 +57,8 @@ app pool = do
         json $ M.fromList [("id" :: String, show $ toSlug $ graphId)]
 
     where
-        runDB action = liftIO $ Mongo.runMongoDBPool Mongo.master action pool
-        from f = f . Mongo.entityVal
+        runDB action = liftIO $ runPool conf action pool
+        from f = f . entityVal
         plainJson t = text t >> setHeader "content-type" "text/json"
 
         base62   = concat . transpose $ [['a'..'z'], ['0'..'9'], ['A'..'Z']]
