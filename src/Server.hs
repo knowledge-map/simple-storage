@@ -5,7 +5,7 @@ import Network.HTTP.Types.Status (notFound404)
 
 import Model
 import qualified Database.Persist as DB
-import Database.Persist ((==.))
+import Database.Persist ((==.), (=.))
 import qualified Database.Persist.MongoDB as Mongo
 
 import System.Environment (getEnvironment)
@@ -22,13 +22,13 @@ main :: IO ()
 main = do
     conn <- getEnvDef "MONGOLAB_URI" devMongo >>= return . parseDatabaseUrl
     port <- fmap read $ getEnvDef "PORT" "8000"
-    scotty port (app conn)
+    withMongoDBConf (mongoConfFrom conn) $ \pool -> scotty port (app pool)
     where
         devMongo = "mongodb://test:test@localhost:27017/simple-storage"
         getEnvDef e d = getEnvironment >>= return . fromMaybe d . lookup e
 
-app :: DatabaseConnInfo -> ScottyM ()
-app conn = do
+app :: Mongo.ConnectionPool -> ScottyM ()
+app pool = do
     get "/" $ text "Nothing to see here *whistles*"
 
     get "/:slug" $ do
@@ -39,9 +39,10 @@ app conn = do
             Nothing -> text "404 not found" >> status notFound404
 
     put "/:slug" $ do
-        -- graphId <- fmap fromSlug $ param "slug"
-        req <- jsonData
-        text req
+        graphId  <- fmap fromSlug $ param "slug"
+        contents <- fmap (toStrict . decodeUtf8) body
+        runDB $ DB.updateWhere [GraphIdent ==. graphId] [GraphConfig =. contents]
+        text $ fromStrict contents
         respondJson
 
     post "/" $ do
@@ -56,7 +57,7 @@ app conn = do
         json $ M.fromList [("id" :: String, show $ toSlug $ graphId)]
 
     where
-        runDB = liftIO . withMongoDBConf (mongoConfFrom conn)
+        runDB action = liftIO $ Mongo.runMongoDBPool Mongo.master action pool
         from f = f . Mongo.entityVal
         respondJson = setHeader "content-type" "text/json"
 
