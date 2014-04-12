@@ -30,9 +30,12 @@ main = do
         getEnvDef e d = getEnvironment >>= return . fromMaybe d . lookup e
 
 app conf pool = do
-    get "/" $ text "Nothing to see here *whistles*"
+    get "/" $ do
+        allowAllOrigins
+        text "Nothing to see here *whistles*"
 
     get "/:slug" $ do
+        allowAllOrigins
         graphId <- fmap fromSlug $ param "slug"
         graph <- runDB $ DB.selectFirst [GraphIdent ==. graphId] []
         case graph of
@@ -40,12 +43,14 @@ app conf pool = do
             Nothing -> text "404 not found" >> status notFound404
 
     put "/:slug" $ do
+        allowAllOrigins
         graphId  <- fmap fromSlug $ param "slug"
         contents <- fmap (toStrict . decodeUtf8) body
         runDB $ DB.updateWhere [GraphIdent ==. graphId] [GraphConfig =. contents]
         plainJson $ fromStrict contents
 
     post "/" $ do
+        allowAllOrigins
         contents <- fmap (toStrict . decodeUtf8) body
         graphId <- runDB $ do
             existingEnt <- DB.selectFirst [] [DB.Desc GraphIdent]
@@ -60,6 +65,7 @@ app conf pool = do
         runDB action = liftIO $ runPool conf action pool
         from f = f . entityVal
         plainJson t = text t >> setHeader "content-type" "text/json"
+        allowAllOrigins = setHeader "Access-Control-Allow-Origin" "*"
 
         base62   = concat . transpose $ [['a'..'z'], ['0'..'9'], ['A'..'Z']]
         toSlug   = encodeWith base62
