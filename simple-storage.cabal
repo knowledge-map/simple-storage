@@ -21,6 +21,6 @@ executable simple-storage
                         containers, random, mtl, text,
                         monad-control,
                         base >= 4.6 && < 5
-  ghc-options:          -Wall -fno-warn-unused-do-bind
+  ghc-options:          -threaded -O -Wall -fno-warn-unused-do-bind
   default-extensions:   OverloadedStrings
   default-language:     Haskell2010
