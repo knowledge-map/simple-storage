@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
 module Main where
 
 import Web.Scotty
