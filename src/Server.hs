@@ -5,10 +5,11 @@ import Network.HTTP.Types.Status (notFound404)
 import Network.HTTP.Types.Method (StdMethod(OPTIONS))
 
 import Model
+import ModelFields
 import Database.Persist hiding (get, insert)
 import qualified Database.Persist as DB
 
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.List (elemIndex, mapAccumR, transpose)
 import Data.Text.Lazy (fromStrict, toStrict)
 import Data.Text.Lazy.Encoding (decodeUtf8)
@@ -42,7 +43,7 @@ app conf pool = do
             let newId = case existingEnt of
                     Nothing  -> 10000
                     Just ent -> (graphIdent `from` ent) + 1
-            DB.insert $ Graph newId contents
+            DB.insert $ Graph newId contents Unlocked
             return newId
         json $ M.fromList [("id" :: String, toSlug $ graphId)]
 
@@ -52,14 +53,19 @@ app conf pool = do
         graphId <- fmap fromSlug $ param "slug"
         graph <- runDB $ DB.selectFirst [GraphIdent ==. graphId] []
         case graph of
-            Just g  -> plainJson $ fromStrict $ graphConfig `from` g
+            Just g  -> plainJson $ fromStrict $ graphContents `from` g
             Nothing -> text "404 not found" >> status notFound404
 
     put "/:slug" $ do
         allowAllOrigins
         graphId  <- fmap fromSlug $ param "slug"
         contents <- fmap (toStrict . decodeUtf8) body
-        runDB $ DB.updateWhere [GraphIdent ==. graphId] [GraphConfig =. contents]
+        lock <- fmap (lockFromBool . isJust . lookup "lock") params
+        runDB $ DB.updateWhere
+            [GraphIdent ==. graphId,
+             GraphLocked ==. Unlocked]
+            [GraphContents =. contents,
+             GraphLocked =. lock]
         plainJson $ fromStrict contents
 
     where

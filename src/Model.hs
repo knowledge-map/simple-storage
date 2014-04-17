@@ -11,6 +11,8 @@
 
 module Model where
 
+import ModelFields
+
 import Data.Text (Text, pack, unpack, breakOn)
 import qualified Data.Text as T
 import Database.Persist.TH
@@ -27,7 +29,8 @@ share [mkPersist (mkPersistSettings (ConT ''MongoBackend)) {
  }] [persistLowerCase|
 Graph
     ident Int
-    config Text
+    contents Text
+    locked Lock
     deriving Show
 |]
 
